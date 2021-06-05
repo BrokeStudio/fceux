@@ -96,6 +96,7 @@ private:
 		FILE_GET_FREE_ID,
 		FILE_GET_INFO,
 		FILE_DOWNLOAD,
+		FILE_FORMAT,
 	};
 
 	// Defined message types from ESP to CPU

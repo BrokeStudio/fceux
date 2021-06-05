@@ -832,6 +832,19 @@ void BrokeStudioFirmware::processBufferedMessage() {
 				this->downloadFile(url, path, file);
 			}
 			break;
+		case toesp_cmds_t::FILE_FORMAT:
+			UDBG("RAINBOW BrokeStudioFirmware received message FILE_FORMAT\n");
+			if (message_size == 1) {
+				// Clear file list
+				for (uint8 p = 0; p < NUM_FILE_PATHS; p++)
+				{
+					for (uint8 f = 0; f < NUM_FILES; f++)
+					{
+						this->file_exists[p][f] = false;
+					}
+				}
+			}
+			break;
 		default:
 			UDBG("RAINBOW BrokeStudioFirmware received unknown message %02x\n", this->rx_buffer.at(1));
 			break;
@@ -1597,6 +1610,24 @@ void BrokeStudioFirmware::httpdEvent(mg_connection *nc, int ev, void *ev_data) {
 
 			// Return something webbrowser friendly
 			send_message(200, "{\"success\":\"true\"}\n", "application/json");
+		}else if (std::string("/api/file/format") == std::string(hm->uri.p, hm->uri.len)) {
+			if (mg_vcasecmp(&hm->method, "GET") == 0) {
+				// Clear file list
+				for (uint8 p = 0; p < NUM_FILE_PATHS; p++)
+				{
+					for (uint8 f = 0; f < NUM_FILES; f++)
+					{
+						self->file_exists[p][f] = false;
+					}
+				}
+				UDBG("RAINBOW Web(self=%p) sucessfuly formatted file system %d/%d\n", self);
+
+				// Return something webbrowser friendly
+				send_message(200, "{\"success\":\"true\"}\n", "application/json");
+			}
+			else {
+				send_generic_error();
+			}
 		}else {
 			char const* www_root = ::getenv("RAINBOW_WWW_ROOT");
 			if (www_root == NULL) {
