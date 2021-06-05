@@ -53,8 +53,9 @@
 #define PRG_MODE_16K_8K     0b0 // 16K + 8K + 8K fixed
 #define PRG_MODE_8K_8K_8K   0b1 // 8K + 8K + 8K fixed
 
-static uint8 prg[3], chr[8], wram_bank;
-static uint8 prg_mode, chr_mode_chip, chr_mode;
+static uint8 prg_mode, prg[3], wram_bank;
+static uint16 chr[8];
+static uint8 chr_mode_chip, chr_mode, chr_upper_bank;
 static uint8 mirr_mode, nt_set;
 
 static uint8 *WRAM = NULL;
@@ -198,24 +199,21 @@ static void Sync(void) {
 	{
 	case CHR_MODE_1K:
 		for (uint8 i = 0; i < 8; i++) {
-			if ((i < 4) | (chr_mode_chip == CHR_TYPE_RAM))
-				setchr1r(cart_chr_map, i << 10, chr[i]);
-			else
-				setchr1r(cart_chr_map, i << 10, chr[i] + 256);
+			setchr1r(cart_chr_map, i << 10, chr[i] & 0x1ff);
 		}
 		break;
 	case CHR_MODE_2K:
-		setchr2r(cart_chr_map, 0x0000, chr[0]);
-		setchr2r(cart_chr_map, 0x0800, chr[1]);
-		setchr2r(cart_chr_map, 0x1000, chr[2]);
-		setchr2r(cart_chr_map, 0x1800, chr[3]);
+		setchr2r(cart_chr_map, 0x0000, chr[0] & 0xff);
+		setchr2r(cart_chr_map, 0x0800, chr[1] & 0xff);
+		setchr2r(cart_chr_map, 0x1000, chr[2] & 0xff);
+		setchr2r(cart_chr_map, 0x1800, chr[3] & 0xff);
 		break;
 	case CHR_MODE_4K:
-		setchr4r(cart_chr_map, 0x0000, chr[0]);
-		setchr4r(cart_chr_map, 0x1000, chr[1]);
+		setchr4r(cart_chr_map, 0x0000, chr[0] & 0xff);
+		setchr4r(cart_chr_map, 0x1000, chr[1] & 0xff);
 		break;
 	case CHR_MODE_8K:
-		setchr8r(cart_chr_map, chr[0]);
+		setchr8r(cart_chr_map, chr[0] & 0xff);
 		break;
 	}
 
@@ -333,15 +331,15 @@ static DECLFW(RainbowWrite) {
 		nt_set = (V & 0xC0) >> 6;
 		Sync();
 		break;
-
-	case 0x5400: chr[0] = V; Sync(); break;
-	case 0x5401: chr[1] = V; Sync(); break;
-	case 0x5402: chr[2] = V; Sync(); break;
-	case 0x5403: chr[3] = V; Sync(); break;
-	case 0x5404: chr[4] = V; Sync(); break;
-	case 0x5405: chr[5] = V; Sync(); break;
-	case 0x5406: chr[6] = V; Sync(); break;
-	case 0x5407: chr[7] = V; Sync(); break;
+	case 0x5007: chr_upper_bank = V & 0x01; Sync(); break;
+	case 0x5400: chr[0] = V | (chr_mode == CHR_MODE_1K ? chr_upper_bank << 8 : 0); Sync(); break;
+	case 0x5401: chr[1] = V | (chr_mode == CHR_MODE_1K ? chr_upper_bank << 8 : 0); Sync(); break;
+	case 0x5402: chr[2] = V | (chr_mode == CHR_MODE_1K ? chr_upper_bank << 8 : 0); Sync(); break;
+	case 0x5403: chr[3] = V | (chr_mode == CHR_MODE_1K ? chr_upper_bank << 8 : 0); Sync(); break;
+	case 0x5404: chr[4] = V | (chr_mode == CHR_MODE_1K ? chr_upper_bank << 8 : 0); Sync(); break;
+	case 0x5405: chr[5] = V | (chr_mode == CHR_MODE_1K ? chr_upper_bank << 8 : 0); Sync(); break;
+	case 0x5406: chr[6] = V | (chr_mode == CHR_MODE_1K ? chr_upper_bank << 8 : 0); Sync(); break;
+	case 0x5407: chr[7] = V | (chr_mode == CHR_MODE_1K ? chr_upper_bank << 8 : 0); Sync(); break;
 
 	case 0x5C04: IRQLatch = V; break;
 	case 0x5C05: IRQReload = 1; break;
