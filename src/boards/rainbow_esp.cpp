@@ -1631,7 +1631,7 @@ void BrokeStudioFirmware::httpdEvent(mg_connection *nc, int ev, void *ev_data) {
 			// Return something webbrowser friendly
 			send_message(200, "{\"success\":\"true\"}\n", "application/json");
 		}else if (std::string("/api/file/format") == std::string(hm->uri.p, hm->uri.len)) {
-			if (mg_vcasecmp(&hm->method, "GET") == 0) {
+			if (mg_vcasecmp(&hm->method, "POST") == 0) {
 				// Clear file list
 				for (uint8 p = 0; p < NUM_FILE_PATHS; p++)
 				{
