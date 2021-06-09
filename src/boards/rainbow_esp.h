@@ -85,6 +85,7 @@ private:
 		// FILE CMDS
 		FILE_OPEN,
 		FILE_CLOSE,
+		FILE_STATUS,
 		FILE_EXISTS,
 		FILE_DELETE,
 		FILE_SET_CUR,
@@ -123,6 +124,7 @@ private:
 		NETWORK_REGISTERED,
 
 		// FILE CMDS
+		FILE_STATUS,
 		FILE_EXISTS,
 		FILE_DELETE,
 		FILE_LIST,
@@ -156,7 +158,6 @@ private:
 		DOWNLOAD_FAILED,
 		INVALID_PATH_OR_FILE,
 	};
-
 
 	void processBufferedMessage();
 	void readFile(uint8 path, uint8 file, uint8 n, uint32 offset);

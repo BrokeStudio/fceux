@@ -599,6 +599,26 @@ void BrokeStudioFirmware::processBufferedMessage() {
 			this->working_file = NO_WORKING_FILE;
 			this->saveFiles();
 			break;
+		case toesp_cmds_t::FILE_STATUS:
+			UDBG("RAINBOW BrokeStudioFirmware received message FILE_STATUS\n");
+			if (this->working_file == NO_WORKING_FILE) {
+				this->tx_messages.push_back({
+					2,
+					static_cast<uint8>(fromesp_cmds_t::FILE_STATUS),
+					0
+					});
+			}
+			else
+			{
+				this->tx_messages.push_back({
+					4,
+					static_cast<uint8>(fromesp_cmds_t::FILE_STATUS),
+					1,
+					static_cast<uint8>(this->working_path),
+					static_cast<uint8>(this->working_file),
+					});
+			}
+			break;
 		case toesp_cmds_t::FILE_EXISTS:
 			UDBG("RAINBOW BrokeStudioFirmware received message FILE_EXISTS\n");
 			if (message_size == 3) {
