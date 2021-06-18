@@ -143,16 +143,21 @@ private:
 		UDP,
 	};
 
-	enum class file_delete_results_t : uint8
-	{
+	// FILE_CONFIG
+	enum class file_config_flags_t : uint8 {
+		ACCESS_MODE = 1,
+		AUTO_ACCESS_MODE = 0,
+		MANUAL_ACCESS_MODE = 1
+	};
+
+	enum class file_delete_results_t : uint8 {
 		SUCCESS,
 		ERROR_WHILE_DELETING_FILE,
 		FILE_NOT_FOUND,
 		INVALID_PATH_OR_FILE,
 	};
 
-	enum class file_download_results_t : uint8
-	{
+	enum class file_download_results_t : uint8 {
 		SUCCESS,
 		ERROR_WHILE_DELETING_FILE,
 		DOWNLOAD_FAILED,
@@ -198,6 +203,7 @@ private:
 	std::array<std::array<std::vector<uint8>, NUM_FILES>, NUM_FILE_PATHS> files;
 	std::array<std::array<bool, NUM_FILES>, NUM_FILE_PATHS> file_exists;
 	uint32 file_offset = 0;
+	uint8 working_file_config = 0;
 	uint8 working_path = 0;
 	uint8 working_file = NO_WORKING_FILE;
 

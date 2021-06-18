@@ -580,107 +580,167 @@ void BrokeStudioFirmware::processBufferedMessage() {
 
 		// FILE CMDS
 
-		case toesp_cmds_t::FILE_OPEN:
+		case toesp_cmds_t::FILE_OPEN: {
 			UDBG("RAINBOW BrokeStudioFirmware received message FILE_OPEN\n");
-			if (message_size == 3) {
-				uint8 const path = this->rx_buffer.at(2);
-				uint8 const file = this->rx_buffer.at(3);
-				if (path < NUM_FILE_PATHS && file < NUM_FILES) {
-					this->file_exists[path][file] = true;
-					this->working_path = path;
-					this->working_file = file;
-					this->file_offset = 0;
-					this->saveFiles();
+			if (message_size >= 4) {
+				uint8 config = this->rx_buffer.at(2);
+				uint8 access_mode = config & static_cast<uint8>(file_config_flags_t::ACCESS_MODE);
+
+				if (access_mode == static_cast<uint8>(file_config_flags_t::AUTO_ACCESS_MODE)) {
+					// auto mode
+
+					uint8 const path = this->rx_buffer.at(3);
+					uint8 const file = this->rx_buffer.at(4);
+					if (path < NUM_FILE_PATHS && file < NUM_FILES) {
+						this->file_exists[path][file] = true;
+						this->working_path = path;
+						this->working_file = file;
+						this->working_file_config = config;
+						this->file_offset = 0;
+						this->saveFiles();
+					}
+
 				}
+				else {
+					// manual mode
+
+				}
+
 			}
 			break;
+		}
 		case toesp_cmds_t::FILE_CLOSE:
 			UDBG("RAINBOW BrokeStudioFirmware received message FILE_CLOSE\n");
 			this->working_file = NO_WORKING_FILE;
 			this->saveFiles();
 			break;
-		case toesp_cmds_t::FILE_STATUS:
+		case toesp_cmds_t::FILE_STATUS: {
 			UDBG("RAINBOW BrokeStudioFirmware received message FILE_STATUS\n");
-			if (this->working_file == NO_WORKING_FILE) {
-				this->tx_messages.push_back({
-					2,
-					static_cast<uint8>(fromesp_cmds_t::FILE_STATUS),
-					0
-					});
+
+			uint8 access_mode = this->working_file_config & static_cast<uint8>(file_config_flags_t::ACCESS_MODE);
+
+			if (access_mode == static_cast<uint8>(file_config_flags_t::AUTO_ACCESS_MODE)) {
+				// auto mode
+
+				if (this->working_file == NO_WORKING_FILE) {
+					this->tx_messages.push_back({
+						2,
+						static_cast<uint8>(fromesp_cmds_t::FILE_STATUS),
+						0
+						});
+				}
+				else {
+					this->tx_messages.push_back({
+						5,
+						static_cast<uint8>(fromesp_cmds_t::FILE_STATUS),
+						1,
+						static_cast<uint8>(this->working_file_config),
+						static_cast<uint8>(this->working_path),
+						static_cast<uint8>(this->working_file),
+						});
+				}
+
 			}
-			else
-			{
-				this->tx_messages.push_back({
-					4,
-					static_cast<uint8>(fromesp_cmds_t::FILE_STATUS),
-					1,
-					static_cast<uint8>(this->working_path),
-					static_cast<uint8>(this->working_file),
-					});
+			else {
+				// manual mode
+
 			}
+
 			break;
-		case toesp_cmds_t::FILE_EXISTS:
+		}
+		case toesp_cmds_t::FILE_EXISTS: {
 			UDBG("RAINBOW BrokeStudioFirmware received message FILE_EXISTS\n");
-			if (message_size == 3) {
-				uint8 const path = this->rx_buffer.at(2);
-				uint8 const file = this->rx_buffer.at(3);
-				if (path < NUM_FILE_PATHS && file < NUM_FILES) {
-					this->tx_messages.push_back({
-						2,
-						static_cast<uint8>(fromesp_cmds_t::FILE_EXISTS),
-						static_cast<uint8>(this->file_exists[path][file] ? 1 : 0)
-					});
-				}
-			}
-			break;
-		case toesp_cmds_t::FILE_DELETE:
-			UDBG("RAINBOW BrokeStudioFirmware received message FILE_DELETE\n");
-			if (message_size == 3) {
-				uint8 const path = this->rx_buffer.at(2);
-				uint8 const file = this->rx_buffer.at(3);
-				if (path < NUM_FILE_PATHS && file < NUM_FILES) {
-					if (this->file_exists[path][file]) {
-						// File exists, let's delete it
-						this->files[path][file].clear();
-						this->file_exists[path][file] = false;
+
+			uint8 config = this->rx_buffer.at(2);
+			uint8 access_mode = config & static_cast<uint8>(file_config_flags_t::ACCESS_MODE);
+
+			if (access_mode == static_cast<uint8>(file_config_flags_t::AUTO_ACCESS_MODE)) {
+				// auto mode
+
+				if (message_size == 3) {
+					uint8 const path = this->rx_buffer.at(3);
+					uint8 const file = this->rx_buffer.at(4);
+					if (path < NUM_FILE_PATHS && file < NUM_FILES) {
 						this->tx_messages.push_back({
 							2,
-							static_cast<uint8>(fromesp_cmds_t::FILE_DELETE),
-							static_cast<uint8>(file_delete_results_t::SUCCESS)
-						});
-						this->saveFiles();
-					}else {
-						// File does not exist
-						this->tx_messages.push_back({
-							2,
-							static_cast<uint8>(fromesp_cmds_t::FILE_DELETE),
-							static_cast<uint8>(file_delete_results_t::FILE_NOT_FOUND)
-						});
+							static_cast<uint8>(fromesp_cmds_t::FILE_EXISTS),
+							static_cast<uint8>(this->file_exists[path][file] ? 1 : 0)
+							});
 					}
-				}else {
-					// Error while deleting the file
-					this->tx_messages.push_back({
-						2,
-						static_cast<uint8>(fromesp_cmds_t::FILE_DELETE),
-						static_cast<uint8>(file_delete_results_t::INVALID_PATH_OR_FILE)
-					});
 				}
+
+			}
+			else {
+				// manual mode
+
 			}
 			break;
+		}
+		case toesp_cmds_t::FILE_DELETE: {
+			UDBG("RAINBOW BrokeStudioFirmware received message FILE_DELETE\n");
+
+			uint8 config = this->rx_buffer.at(2);
+			uint8 access_mode = config & static_cast<uint8>(file_config_flags_t::ACCESS_MODE);
+
+			if (access_mode == static_cast<uint8>(file_config_flags_t::AUTO_ACCESS_MODE)) {
+				// auto mode
+
+				if (message_size == 4) {
+					uint8 const path = this->rx_buffer.at(3);
+					uint8 const file = this->rx_buffer.at(4);
+					if (path < NUM_FILE_PATHS && file < NUM_FILES) {
+						if (this->file_exists[path][file]) {
+							// File exists, let's delete it
+							this->files[path][file].clear();
+							this->file_exists[path][file] = false;
+							this->tx_messages.push_back({
+								2,
+								static_cast<uint8>(fromesp_cmds_t::FILE_DELETE),
+								static_cast<uint8>(file_delete_results_t::SUCCESS)
+								});
+							this->saveFiles();
+						}
+						else {
+							// File does not exist
+							this->tx_messages.push_back({
+								2,
+								static_cast<uint8>(fromesp_cmds_t::FILE_DELETE),
+								static_cast<uint8>(file_delete_results_t::FILE_NOT_FOUND)
+								});
+						}
+					}
+					else {
+						// Error while deleting the file
+						this->tx_messages.push_back({
+							2,
+							static_cast<uint8>(fromesp_cmds_t::FILE_DELETE),
+							static_cast<uint8>(file_delete_results_t::INVALID_PATH_OR_FILE)
+							});
+					}
+				}
+
+			}
+			else {
+				// manual mode
+
+			}
+
+			break;
+		}
 		case toesp_cmds_t::FILE_SET_CUR:
 			UDBG("RAINBOW BrokeStudioFirmware received message FILE_SET_CUR\n");
 			if (2 <= message_size && message_size <= 5) {
-				this->file_offset = this->rx_buffer[2];
-				this->file_offset += static_cast<uint32>(message_size >= 3 ? this->rx_buffer[3] : 0) << 8;
-				this->file_offset += static_cast<uint32>(message_size >= 4 ? this->rx_buffer[4] : 0) << 16;
-				this->file_offset += static_cast<uint32>(message_size >= 5 ? this->rx_buffer[5] : 0) << 24;
+				this->file_offset = this->rx_buffer.at(2);
+				this->file_offset += static_cast<uint32>(message_size >= 3 ? this->rx_buffer.at(3) : 0) << 8;
+				this->file_offset += static_cast<uint32>(message_size >= 4 ? this->rx_buffer.at(4) : 0) << 16;
+				this->file_offset += static_cast<uint32>(message_size >= 5 ? this->rx_buffer.at(5) : 0) << 24;
 			}
 			break;
 		case toesp_cmds_t::FILE_READ:
 			UDBG("RAINBOW BrokeStudioFirmware received message FILE_READ\n");
 			if (message_size == 2) {
 				if (this->working_file != NO_WORKING_FILE) {
-					uint8 const n = this->rx_buffer[2];
+					uint8 const n = this->rx_buffer.at(2);
 					this->readFile(this->working_path, this->working_file, n, this->file_offset);
 					this->file_offset += n;
 					UDBG("working file offset: %u (%x)\n", this->file_offset, this->file_offset);
@@ -706,66 +766,97 @@ void BrokeStudioFirmware::processBufferedMessage() {
 				this->writeFile(this->working_path, this->working_file, this->files[working_path][working_file].size(), this->rx_buffer.begin() + 2, this->rx_buffer.begin() + message_size + 1);
 			}
 			break;
-		case toesp_cmds_t::FILE_COUNT:
+		case toesp_cmds_t::FILE_COUNT: {
 			UDBG("RAINBOW BrokeStudioFirmware received message FILE_COUNT\n");
-			if (message_size == 2) {
-				uint8 const path = this->rx_buffer[2];
-				if (path >= NUM_FILE_PATHS) {
-					this->tx_messages.push_back({
-						2,
-						static_cast<uint8>(fromesp_cmds_t::FILE_COUNT),
-						0
-					});
-				}else {
-					uint8 nb_files = 0;
-					for (bool exists : this->file_exists[path]) {
-						if (exists) {
-							++nb_files;
-						}
+
+			uint8 config = this->rx_buffer.at(2);
+			uint8 access_mode = config & static_cast<uint8>(file_config_flags_t::ACCESS_MODE);
+
+			if (access_mode == static_cast<uint8>(file_config_flags_t::AUTO_ACCESS_MODE)) {
+				// auto mode
+
+				if (message_size == 3) {
+					uint8 const path = this->rx_buffer.at(3);
+					if (path >= NUM_FILE_PATHS) {
+						this->tx_messages.push_back({
+							2,
+							static_cast<uint8>(fromesp_cmds_t::FILE_COUNT),
+							0
+							});
 					}
-					this->tx_messages.push_back({
-						2,
-						static_cast<uint8>(fromesp_cmds_t::FILE_COUNT),
-						nb_files
-					});
-					UDBG("%u files found in path %u\n", nb_files, path);
+					else {
+						uint8 nb_files = 0;
+						for (bool exists : this->file_exists[path]) {
+							if (exists) {
+								++nb_files;
+							}
+						}
+						this->tx_messages.push_back({
+							2,
+							static_cast<uint8>(fromesp_cmds_t::FILE_COUNT),
+							nb_files
+							});
+						UDBG("%u files found in path %u\n", nb_files, path);
+					}
 				}
+
 			}
+			else {
+				// manual mode
+
+			}
+
 			break;
-		case toesp_cmds_t::FILE_GET_LIST:
+		}
+		case toesp_cmds_t::FILE_GET_LIST: {
 			UDBG("RAINBOW BrokeStudioFirmware received message FILE_GET_LIST\n");
-			if (message_size >= 2) {
-				std::vector<uint8> existing_files;
-				uint8 const path = this->rx_buffer[2];
-				uint8 page_size = NUM_FILES;
-				uint8 current_page = 0;
-				if (message_size == 4) {
-					page_size = this->rx_buffer[3];
-					current_page = this->rx_buffer[4];
-				}
-				uint8 page_start = current_page * page_size;
-				uint8 page_end = current_page * page_size + page_size;
-				uint8 nFiles = 0;
-				if (page_end > this->file_exists[path].size())
-					page_end = this->file_exists[path].size();
-				for (uint8 i = 0; i < NUM_FILES; ++i) {
-					if (this->file_exists[path][i]) {
-						if (nFiles >= page_start && nFiles < page_end) {
-							existing_files.push_back(i);
-						}
-						nFiles++;
+
+			uint8 config = this->rx_buffer.at(2);
+			uint8 access_mode = config & static_cast<uint8>(file_config_flags_t::ACCESS_MODE);
+
+			if (access_mode == static_cast<uint8>(file_config_flags_t::AUTO_ACCESS_MODE)) {
+				// auto mode
+
+				if (message_size >= 3) {
+					std::vector<uint8> existing_files;
+					uint8 const path = this->rx_buffer.at(3);
+					uint8 page_size = NUM_FILES;
+					uint8 current_page = 0;
+					if (message_size == 5) {
+						page_size = this->rx_buffer.at(4);
+						current_page = this->rx_buffer.at(5);
 					}
-					if (nFiles >= page_end) break;
+					uint8 page_start = current_page * page_size;
+					uint8 page_end = current_page * page_size + page_size;
+					uint8 nFiles = 0;
+					if (page_end > this->file_exists[path].size())
+						page_end = this->file_exists[path].size();
+					for (uint8 i = 0; i < NUM_FILES; ++i) {
+						if (this->file_exists[path][i]) {
+							if (nFiles >= page_start && nFiles < page_end) {
+								existing_files.push_back(i);
+							}
+							nFiles++;
+						}
+						if (nFiles >= page_end) break;
+					}
+					std::deque<uint8> message({
+						static_cast<uint8>(existing_files.size() + 2),
+						static_cast<uint8>(fromesp_cmds_t::FILE_LIST),
+						static_cast<uint8>(existing_files.size())
+						});
+					message.insert(message.end(), existing_files.begin(), existing_files.end());
+					this->tx_messages.push_back(message);
 				}
-				std::deque<uint8> message({
-					static_cast<uint8>(existing_files.size() + 2),
-					static_cast<uint8>(fromesp_cmds_t::FILE_LIST),
-					static_cast<uint8>(existing_files.size())
-				});
-				message.insert(message.end(), existing_files.begin(), existing_files.end());
-				this->tx_messages.push_back(message);
+
 			}
+			else {
+				// manual mode
+
+			}
+
 			break;
+		}
 		case toesp_cmds_t::FILE_GET_FREE_ID:
 			UDBG("RAINBOW BrokeStudioFirmware received message FILE_GET_FREE_ID\n");
 			if (message_size == 2) {
@@ -786,72 +877,106 @@ void BrokeStudioFirmware::processBufferedMessage() {
 				}
 			}
 			break;
-		case toesp_cmds_t::FILE_GET_INFO:
+		case toesp_cmds_t::FILE_GET_INFO: {
 			UDBG("RAINBOW BrokeStudioFirmware received message FILE_GET_INFO\n");
-			if (message_size == 3) {
-				uint8 const path = this->rx_buffer.at(2);
-				uint8 const file = this->rx_buffer.at(3);
-				if (path < NUM_FILE_PATHS && file < NUM_FILES && this->file_exists[path][file]) {
-					// Compute info
-					uint32 file_crc32;
-					file_crc32 = CalcCRC32(0L, this->files[path][file].data(), this->files[path][file].size());
 
-					uint32 file_size = this->files[path][file].size();
+			uint8 config = this->rx_buffer.at(2);
+			uint8 access_mode = config & static_cast<uint8>(file_config_flags_t::ACCESS_MODE);
 
-					// Send info
-					this->tx_messages.push_back({
-						9,
-						static_cast<uint8>(fromesp_cmds_t::FILE_INFO),
+			if (access_mode == static_cast<uint8>(file_config_flags_t::AUTO_ACCESS_MODE)) {
+				// auto mode
 
-						static_cast<uint8>((file_crc32 >> 24) & 0xff),
-						static_cast<uint8>((file_crc32 >> 16) & 0xff),
-						static_cast<uint8>((file_crc32 >> 8) & 0xff),
-						static_cast<uint8>(file_crc32 & 0xff),
+				if (message_size == 4) {
+					uint8 const path = this->rx_buffer.at(3);
+					uint8 const file = this->rx_buffer.at(4);
+					if (path < NUM_FILE_PATHS && file < NUM_FILES && this->file_exists[path][file]) {
+						// Compute info
+						uint32 file_crc32;
+						file_crc32 = CalcCRC32(0L, this->files[path][file].data(), this->files[path][file].size());
 
-						static_cast<uint8>((file_size >> 24) & 0xff),
-						static_cast<uint8>((file_size >> 16) & 0xff),
-						static_cast<uint8>((file_size >> 8 ) & 0xff),
-						static_cast<uint8>(file_size & 0xff)
-					});
-				}else {
-					// File not found or path/file out of bounds
-					this->tx_messages.push_back({
-						1,
-						static_cast<uint8>(fromesp_cmds_t::FILE_INFO)
-					});
-				}
-			}
-			break;
-		case toesp_cmds_t::FILE_DOWNLOAD:
-			UDBG("RAINBOW BrokeStudioFirmware received message FILE_DOWNLOAD\n");
-			if (message_size > 3) {
-				// Parse
-				uint8 const path = this->rx_buffer.at(2);
-				uint8 const file = this->rx_buffer.at(3);
-				std::string const url(this->rx_buffer.begin() + 4, this->rx_buffer.end());
+						uint32 file_size = this->files[path][file].size();
 
-				// Delete existing file
-				if (path < NUM_FILE_PATHS && file < NUM_FILES) {
-					if (this->file_exists[path][file]) {
-						// File exists, let's delete it
-						this->files[path][file].clear();
-						this->file_exists[path][file] = false;
-						this->saveFiles();
+						// Send info
+						this->tx_messages.push_back({
+							9,
+							static_cast<uint8>(fromesp_cmds_t::FILE_INFO),
+
+							static_cast<uint8>((file_crc32 >> 24) & 0xff),
+							static_cast<uint8>((file_crc32 >> 16) & 0xff),
+							static_cast<uint8>((file_crc32 >> 8) & 0xff),
+							static_cast<uint8>(file_crc32 & 0xff),
+
+							static_cast<uint8>((file_size >> 24) & 0xff),
+							static_cast<uint8>((file_size >> 16) & 0xff),
+							static_cast<uint8>((file_size >> 8) & 0xff),
+							static_cast<uint8>(file_size & 0xff)
+							});
 					}
-				}else {
-					// Invalide path / file
-					this->tx_messages.push_back({
-						2,
-						static_cast<uint8>(fromesp_cmds_t::FILE_DOWNLOAD),
-						static_cast<uint8>(file_download_results_t::INVALID_PATH_OR_FILE)
-					});
-					break;
+					else {
+						// File not found or path/file out of bounds
+						this->tx_messages.push_back({
+							1,
+							static_cast<uint8>(fromesp_cmds_t::FILE_INFO)
+							});
+					}
 				}
 
-				// Download new file
-				this->downloadFile(url, path, file);
 			}
+			else {
+				// manual mode
+
+			}
+
 			break;
+		}
+		case toesp_cmds_t::FILE_DOWNLOAD: {
+			UDBG("RAINBOW BrokeStudioFirmware received message FILE_DOWNLOAD\n");
+
+			uint8 config = this->rx_buffer.at(2);
+			uint8 access_mode = config & static_cast<uint8>(file_config_flags_t::ACCESS_MODE);
+
+			if (access_mode == static_cast<uint8>(file_config_flags_t::AUTO_ACCESS_MODE)) {
+				// auto mode
+
+				if (message_size > 6) {
+					// Parse
+					uint8 const urlLength = this->rx_buffer.at(3);
+					std::string const url(this->rx_buffer.begin() + 4, this->rx_buffer.begin() + 4 + urlLength);
+
+					uint8 const path = this->rx_buffer.at(4 + urlLength);
+					uint8 const file = this->rx_buffer.at(4 + 1 + urlLength);
+
+					// Delete existing file
+					if (path < NUM_FILE_PATHS && file < NUM_FILES) {
+						if (this->file_exists[path][file]) {
+							// File exists, let's delete it
+							this->files[path][file].clear();
+							this->file_exists[path][file] = false;
+							this->saveFiles();
+						}
+					}
+					else {
+						// Invalide path / file
+						this->tx_messages.push_back({
+							2,
+							static_cast<uint8>(fromesp_cmds_t::FILE_DOWNLOAD),
+							static_cast<uint8>(file_download_results_t::INVALID_PATH_OR_FILE)
+							});
+						break;
+					}
+
+					// Download new file
+					this->downloadFile(url, path, file);
+					}
+
+			}
+			else {
+				// manual mode
+
+			}
+
+			break;
+		}
 		case toesp_cmds_t::FILE_FORMAT:
 			UDBG("RAINBOW BrokeStudioFirmware received message FILE_FORMAT\n");
 			if (message_size == 1) {
